@@ -5,9 +5,10 @@ library(plyr)
 
 fluidPage(
   
-  headerPanel('MLRA Climate Graphs'),
+  headerPanel('MLRA Climate Browser'),
   sidebarPanel(
     htmlOutput("MLRA"),
+    htmlOutput("country"),
     htmlOutput("elev"),
     htmlOutput("lat"),
     htmlOutput("lon")
@@ -25,7 +26,7 @@ fluidPage(
                                        'Medieval Units' = 'USC'), 
                         selected = 'm')
     ),
-column(width = 5,
+    column(width = 5,
            radioButtons("RadioGraphtype",inline = T,  label = ("Select Graph"),
                         choiceNames = list(HTML("<font size=-2>Monthly"), 
                                            HTML("Summer × Winter"),
@@ -34,13 +35,15 @@ column(width = 5,
                                            HTML("Summer × pAET"),  
                                            HTML("Winter × pAET"),
                                            HTML("Moisture × Deficit"),
-                                           HTML("Moisture × Seasonality</font>")),
-                        choiceValues = list(1,2,4,5,6,7,8,3),
-                        selected = 1),
-           HTML("</font>")
+                                           HTML("Moisture × Seasonality"),
+                        HTML("Map</font>")),
+           
+           choiceValues = list(1,2,4,5,6,7,8,3,9),
+           selected = 1),
+    HTML("</font>")
     )),
-           fluidRow(
-                  HTML("<font size=-2>Based on 1981-2010 Climatic Normals. Click here for:"),
+  fluidRow(
+      HTML("<font size=-2>Based on 1981-2010 Climatic Normals. Click here for:"),
                   tags$a(href="https://www.researchgate.net/publication/327537609_Climate_Classification_Outline", "climate classification"),
                   HTML(" used above.</font>")
            )

@@ -26,7 +26,7 @@ shinyServer(function(input, output, session) {
     
     output$MLRA = renderUI({
       
-      listMLRA1 <- subset(Norms2010,
+      listMLRA1 <- subset(MLRAStationList,
                          Latitude >= input$lat[1] &
                            Latitude <= input$lat[2] &
                            Longitude >= input$lon[1] &
@@ -39,7 +39,17 @@ shinyServer(function(input, output, session) {
       selectInput(inputId = "MLRA", #name of input
                   label = "Select MLRA or LRU:", #label displayed in ui
                   choices = unique(listMLRA), #calls list of available counties
-                  selected = unique(listMLRA)[1])
+                  selected = '98A')
+    })
+    
+    output$country = renderUI({
+      
+      
+      
+      selectInput(inputId = "country", #name of input
+                  label = "Filter Lat-Lon by Admin Area:", #label displayed in ui
+                  choices = (unique(geomaxmin[,1])), #calls list of available counties
+                  selected = 'NORTHERN AMERICA')
     })
     
     
@@ -53,8 +63,8 @@ shinyServer(function(input, output, session) {
       
     })
     output$lat = renderUI({
-      latmax <- 80
-      latmin <- 0
+      latmax <- geomaxmin[geomaxmin$name %in% input$country, 'latmax']
+      latmin <- geomaxmin[geomaxmin$name %in% input$country, 'latmin']
       sliderInput(inputId = 'lat',
                   label = 'Latitude range',
                   min= -90, max= 90,
@@ -63,8 +73,8 @@ shinyServer(function(input, output, session) {
       
     })
     output$lon = renderUI({
-      lonmax <- -60
-      lonmin <- -150
+      lonmax <- geomaxmin[geomaxmin$name %in% input$country, 'lonmax']
+      lonmin <- geomaxmin[geomaxmin$name %in% input$country, 'lonmin']
       sliderInput(inputId = 'lon',
                   label = 'Longitude range',
                   min= -180, max= 180,
@@ -82,8 +92,10 @@ shinyServer(function(input, output, session) {
     elev <- c(-432, 8848) 
     MLRA <- input$MLRA
     
-
     
+    selectMLRA.shp <- LRU.shptidy[LRU.shptidy$id %in% input$MLRA, ]
+    MLRAname <- LRUNames[LRUNames$LRU %in% input$MLRA,c('MLRA_NAME')]
+    #selectClim <- Norms2010[Norms2010$LRU %in% '98A',]
     
     selectClim <- subset(Norms2010,
                          Latitude >= input$lat[1] &
@@ -92,7 +104,7 @@ shinyServer(function(input, output, session) {
                            Longitude <= input$lon[2] &
                            Elevation >= input$elev[1] &
                            Elevation <= input$elev[2] &
-                           grepl(LRU, MLRA))
+                           LRU %in% MLRA)
     
     #Make Monthly Rows
     #Jan
@@ -131,7 +143,7 @@ shinyServer(function(input, output, session) {
                   sumMonthly$t/(sumMonthly$t+237.3))/
       (sumMonthly$t+273.3)*
       (sumMonthly$Ra)*sumMonthly$Days*
-      abs((sumMonthly$th - sumMonthly$tl)*2)^0.5 + 0.001
+      abs((sumMonthly$th - sumMonthly$tl))^0.5 + 0.001
     sumMonthly <- subset(sumMonthly, select = -c(Day_, Days, hs, Ra, declination))
     sumMonthly$a <- pmin(sumMonthly$e, sumMonthly$p)
     sumMonthly$b <- (sumMonthly$t > 0)*sumMonthly$t 
@@ -210,15 +222,206 @@ shinyServer(function(input, output, session) {
     
     
     
-    selectClim$SP1 <- round(ifelse(selectClim$PPETRatio < 0.5 & selectClim$Surplus < 25 & selectClim$pAET < 75, pmax(selectClim$Surplus/25, selectClim$pAET/75)  ,1),15)
-    selectClim$SP2 <- round(ifelse(selectClim$SP1 >= 1, ifelse(selectClim$pAET < 75 & (selectClim$Deficit >= 150 | selectClim$PPETRatio < 1), pmax(selectClim$pAET/75, 150/(selectClim$Deficit+150)),1),0),15)
-    selectClim$SP3 <- round(ifelse(selectClim$SP2 >= 1, ifelse(selectClim$Deficit >= 150 | selectClim$PPETRatio < 1, pmax(150/(selectClim$Deficit+150)),1),0),15)
-    selectClim$SP4 <- round(ifelse(selectClim$SP3 >= 1, pmin(1-selectClim$Deficit/150),0),15)
-    selectClim$SPindex <- selectClim$SP1 + selectClim$SP2 + selectClim$SP3 + selectClim$SP4 + 1 #Seasonal precipitation index
-    selectClim$Cindex <- pmin(selectClim$Tclx+15, selectClim$Tc) #Cold index
-    selectClim$Dindex <- selectClim$Deficit/(selectClim$Deficit + 100)
-    selectClim$Sindex <- selectClim$Surplus/(selectClim$Surplus + 100)
-    selectClim$Aindex <- selectClim$pAET/(selectClim$pAET + 100)
+        ####-------------
+        StationMeans <- aggregate(selectClim[,c("t01", "t02", "t03", "t04", "t05", "t06",
+                                                "t07", "t08", "t09", "t10", "t11", "t12",
+                                                "tl01", "tl02", "tl03", "tl04", "tl05", "tl06",
+                                                "tl07", "tl08", "tl09", "tl10", "tl11", "tl12",
+                                                "pp01", "pp02", "pp03", "pp04", "pp05", "pp06",
+                                                "pp07", "pp08", "pp09", "pp10", "pp11","pp12")],
+                                  by=list(selectClim$LRU, selectClim$Station_ID, selectClim$Station_Name, selectClim$State, selectClim$Latitude, selectClim$Longitude, selectClim$Elevation), FUN='mean')
+        colnames(StationMeans)[1:7] <- c('LRU', 'Station_ID', 'Station_Name', 'State', 'Latitude', 'Longitude', 'Elevation')
+        StationMeans$b01 <- 0
+        StationMeans$b02 <- 0
+        StationMeans$b03 <- 0
+        StationMeans$b04 <- 0
+        StationMeans$b05 <- 0
+        StationMeans$b06 <- 0
+        StationMeans$b07 <- 0
+        StationMeans$b08 <- 0
+        StationMeans$b09 <- 0
+        StationMeans$b10 <- 0
+        StationMeans$b11 <- 0
+        StationMeans$b12 <- 0
+        for (i in 0:11){
+          StationMeans[,which(colnames(StationMeans)=='b01')+i]  <- StationMeans[,which(colnames(StationMeans)=='t01')+i]*
+            (StationMeans[,which(colnames(StationMeans)=='t01')+i]>0)*1
+        }
+        
+        
+        
+        
+        StationMeans$th01 <- StationMeans$t01*2-StationMeans$tl01
+        StationMeans$th02 <- StationMeans$t02*2-StationMeans$tl02
+        StationMeans$th03 <- StationMeans$t03*2-StationMeans$tl03
+        StationMeans$th04 <- StationMeans$t04*2-StationMeans$tl04
+        StationMeans$th05 <- StationMeans$t05*2-StationMeans$tl05
+        StationMeans$th06 <- StationMeans$t06*2-StationMeans$tl06
+        StationMeans$th07 <- StationMeans$t07*2-StationMeans$tl07
+        StationMeans$th08 <- StationMeans$t08*2-StationMeans$tl08
+        StationMeans$th09 <- StationMeans$t09*2-StationMeans$tl09
+        StationMeans$th10 <- StationMeans$t10*2-StationMeans$tl10
+        StationMeans$th11 <- StationMeans$t11*2-StationMeans$tl11
+        StationMeans$th12 <- StationMeans$t12*2-StationMeans$tl12
+        
+        #calculate extreme winter low----
+        StationMeans$pacificsouth <- 1/((((StationMeans$Latitude - -22.7)/13)^2 + ((StationMeans$Longitude - -82.3)/14)^2)^2+1)
+        StationMeans$amazon2 <- 1/((((StationMeans$Latitude - -10.2)/5)^2 + ((StationMeans$Longitude - -59.9)/10)^2)^2+1)
+        StationMeans$amazon1 <- 1/((((StationMeans$Latitude - -2.8)/14)^2 + ((StationMeans$Longitude - -61.3)/19)^2)^2+1)
+        StationMeans$pacificcent <- 1/((((StationMeans$Latitude - 4.1)/21)^2 + ((StationMeans$Longitude - -122.4)/41)^2)^2+1)
+        StationMeans$mexico <- 1/((((StationMeans$Latitude - 26)/6)^2 + ((StationMeans$Longitude - -98.4)/12)^2)^2+1)
+        StationMeans$florida <- 1/((((StationMeans$Latitude - 27.5)/4)^2 + ((StationMeans$Longitude - -81.1)/8)^2)^2+1)
+        StationMeans$pacificnorth <- 1/((((StationMeans$Latitude - 32.9)/26)^2 + ((StationMeans$Longitude - -145)/27)^2)^2+1)
+        StationMeans$oklahoma <- 1/((((StationMeans$Latitude - 33.6)/4)^2 + ((StationMeans$Longitude - -98.4)/8)^2)^2+1)
+        StationMeans$arizona <- 1/((((StationMeans$Latitude - 34)/12)^2 + ((StationMeans$Longitude - -113.1)/8)^2)^2+1)
+        StationMeans$atlantic <- 1/((((StationMeans$Latitude - 34)/15)^2 + ((StationMeans$Longitude - -60.7)/19)^2)^2+1)
+        StationMeans$himalayas <- 1/((((StationMeans$Latitude - 35.3)/6)^2 + ((StationMeans$Longitude - 91.3)/13)^2)^2+1)
+        StationMeans$kentucky <- 1/((((StationMeans$Latitude - 38.5)/3)^2 + ((StationMeans$Longitude - -87.6)/9)^2)^2+1)
+        StationMeans$detroit <- 1/((((StationMeans$Latitude - 41.8)/3)^2 + ((StationMeans$Longitude - -82.6)/4)^2)^2+1)
+        StationMeans$ontario <- 1/((((StationMeans$Latitude - 44.6)/2)^2 + ((StationMeans$Longitude - -79.2)/6)^2)^2+1)
+        StationMeans$montana <- 1/((((StationMeans$Latitude - 45.4)/5)^2 + ((StationMeans$Longitude - -111.8)/10)^2)^2+1)
+        StationMeans$minn <- 1/((((StationMeans$Latitude - 47.6)/6)^2 + ((StationMeans$Longitude - -92.6)/12)^2)^2+1)
+        StationMeans$hudson <- 1/((((StationMeans$Latitude - 60)/7)^2 + ((StationMeans$Longitude - -87)/34)^2)^2+1)
+        StationMeans$siberia <- 1/((((StationMeans$Latitude - 61.2)/20)^2 + ((StationMeans$Longitude - 105.7)/39)^2)^2+1)
+        StationMeans$california <- 1/((((StationMeans$Latitude - 34.8)/9)^2 + ((StationMeans$Longitude - -128.2)/9)^2)^2+1)
+        StationMeans$washington <- 1/((((StationMeans$Latitude - 46)/5)^2 + ((StationMeans$Longitude - -126.6)/5)^2)^2+1)
+        StationMeans$colorado <- 1/((((StationMeans$Latitude - 38.3)/2)^2 + ((StationMeans$Longitude - -108.8)/3)^2)^2+1)
+        StationMeans$hawaii <- 1/((((StationMeans$Latitude - 21.3)/7)^2 + ((StationMeans$Longitude - -157.5)/11)^2)^2+1)
+        StationMeans$chess <- 1/((((StationMeans$Latitude - 37)/3)^2 + ((StationMeans$Longitude - -74)/3)^2)^2+1)
+        
+        StationMeans$Tg <- pmax(apply(StationMeans[,c('b05','b06','b07','b08','b09','b10')], 1, FUN = mean), apply(StationMeans[,c('b11','b12','b01','b02','b03','b04')], 1, FUN = mean))/1
+        StationMeans$Tc <- apply(StationMeans[,c('t01', 't02', 't04', 't04', 't05', 't06', 't07', 't08', 't09', 't10', 't11', 't12')], 1, FUN = min)
+        StationMeans$Tcl <- apply(StationMeans[,c('tl01', 'tl02', 'tl04', 'tl04', 'tl05', 'tl06', 'tl07', 'tl08', 'tl09', 'tl10', 'tl11', 'tl12')], 1, FUN = min)
+        StationMeans$Tw <- apply(StationMeans[,c('t01', 't02', 't04', 't04', 't05', 't06', 't07', 't08', 't09', 't10', 't11', 't12')], 1, FUN = max)
+        StationMeans$Twh <- apply(StationMeans[,c('th01', 'th02', 'th04', 'th04', 'th05', 'th06', 'th07', 'th08', 'th09', 'th10', 'th11', 'th12')], 1, FUN = max)
+        
+        
+        StationMeans$Tclx<-	-9.171	+
+          StationMeans$Tcl *	1.202	+
+          StationMeans$Latitude *	-0.04149	+
+          StationMeans$Elevation *	0.0008691	+
+          StationMeans$Latitude * StationMeans$Elevation *	-0.00002455	+
+          StationMeans$pacificsouth *	-1.792	+
+          StationMeans$amazon2 *	2.573	+
+          StationMeans$amazon1 *	-1.014	+
+          StationMeans$pacificcent *	-0.749	+
+          StationMeans$mexico *	-0.8227	+
+          StationMeans$florida *	-3.557	+
+          StationMeans$pacificnorth *	-1.246	+
+          StationMeans$oklahoma *	0.1758	+
+          StationMeans$arizona *	2.605	+
+          StationMeans$chess *	0.8347	+
+          StationMeans$atlantic *	0.2967	+
+          StationMeans$himalayas *	-1.814	+
+          StationMeans$kentucky *	-2.644	+
+          StationMeans$detroit *	0	+
+          StationMeans$ontario *	-2.314	+
+          StationMeans$montana *	-4.415	+
+          StationMeans$minn *	1.136	+
+          StationMeans$hudson *	-5.154	+
+          StationMeans$siberia *	-3.797	+
+          StationMeans$california *	4.48	+
+          StationMeans$washington *	3.597	+
+          StationMeans$colorado *	1.458	+
+          StationMeans$hawaii *	6.673	
+        
+        StationMeans <- StationMeans[!is.na(StationMeans$Tclx),]
+        StationMeans <- subset(StationMeans, select = -c(pacificsouth,amazon1,amazon2, pacificcent, mexico, florida,                                               pacificnorth, oklahoma, arizona, atlantic, himalayas, kentucky, 
+                                                         detroit, ontario, montana, minn, hudson, siberia, california, washington, colorado, chess, hawaii))
+        
+        #daylength
+        
+        
+        StationMeans$e01 <- 0
+        StationMeans$e02 <- 0
+        StationMeans$e03 <- 0
+        StationMeans$e04 <- 0
+        StationMeans$e05 <- 0
+        StationMeans$e06 <- 0
+        StationMeans$e07 <- 0
+        StationMeans$e08 <- 0
+        StationMeans$e09 <- 0
+        StationMeans$e10 <- 0
+        StationMeans$e11 <- 0
+        StationMeans$e12 <- 0
+        
+        
+        
+        #----
+        
+        for (i in 0:11){
+          StationMeans$hs = acos(pmin(pmax(-tan(StationMeans$Latitude/360*2*3.141592) * tan(DaysMonth[i+1,]$declination),-1),1))
+          StationMeans$Ra = 
+            117.5 * (StationMeans$hs*sin(StationMeans$Latitude/360*2*3.141592)*sin(DaysMonth[i+1,]$declination) +
+                       cos(StationMeans$Latitude/360*2*3.141592)*cos(DaysMonth[i+1,]$declination)*sin(StationMeans$hs)) / 3.141592
+          
+          StationMeans[,which(colnames(StationMeans)=='e01')+i] <- 0.008404*
+            216.7*exp(17.26939*
+                        StationMeans[,which(colnames(StationMeans)=='t01')+i]/(StationMeans[,which(colnames(StationMeans)=='t01')+i]+237.3))/
+            (StationMeans[,which(colnames(StationMeans)=='t01')+i]+273.3)*
+            (StationMeans$Ra)*DaysMonth[1+i,c('Days')]*
+            abs((StationMeans[,which(colnames(StationMeans)=='t01')+i] - StationMeans[,which(colnames(StationMeans)=='tl01')+i])*2)^0.5 + 0.001
+        }
+        
+        
+        StationMeans <- subset(StationMeans, 
+                               select = -c(hs,Ra))
+        
+        StationMeans$a01 <- 0
+        StationMeans$a02 <- 0
+        StationMeans$a03 <- 0
+        StationMeans$a04 <- 0
+        StationMeans$a05 <- 0
+        StationMeans$a06 <- 0
+        StationMeans$a07 <- 0
+        StationMeans$a08 <- 0
+        StationMeans$a09 <- 0
+        StationMeans$a10 <- 0
+        StationMeans$a11 <- 0
+        StationMeans$a12 <- 0
+        for (i in 0:11){
+          StationMeans[,which(colnames(StationMeans)=='a01')+i] <- 
+            pmin(StationMeans[,which(colnames(StationMeans)=='e01')+i], StationMeans[,which(colnames(StationMeans)=='pp01')+i])
+        }
+        
+        
+        StationMeans$pAET <- apply(StationMeans[,which(colnames(StationMeans)=='a01'):which(colnames(StationMeans)=='a12')], MARGIN = 1, FUN='max')
+        
+        StationMeans$PET <- apply(StationMeans[,which(colnames(StationMeans)=='e01'):which(colnames(StationMeans)=='e12')], MARGIN = 1, FUN='sum')
+        
+        StationMeans$MAP <- apply(StationMeans[,which(colnames(StationMeans)=='pp01'):which(colnames(StationMeans)=='pp12')], MARGIN = 1, FUN='sum')
+        
+        StationMeans$AET <- apply(StationMeans[,which(colnames(StationMeans)=='a01'):which(colnames(StationMeans)=='a12')], MARGIN = 1, FUN='sum')
+        StationMeans$MAAT <- apply(StationMeans[,which(colnames(StationMeans)=='t01'):which(colnames(StationMeans)=='t12')], MARGIN = 1, FUN='mean')
+        
+        StationMeans$Deficit <- pmax(StationMeans$PET - StationMeans$AET, 0)
+        StationMeans$Surplus <- pmax(StationMeans$MAP - StationMeans$AET, 0)
+        
+        
+        StationMeans <- 
+          StationMeans[,c("LRU","Station_ID","Station_Name","State",
+                          "Latitude","Longitude","Elevation","Tg","Tc","Tcl","Tw","Twh","Tclx","MAAT","MAP","PET","AET","pAET",
+                          "Deficit","Surplus")]
+        
+        StationMeans <- merge(StationMeans, NormCoordTrans, by='Station_ID')
+        StationMeans$PPETRatio <- StationMeans$MAP/(StationMeans$PET +0.0001)
+        StationMeans$Mindex <- StationMeans$PPETRatio/(StationMeans$PPETRatio+1)
+        
+        graphymax = input$lat[2]#max(selectClim$Latitude)+10# 
+        graphymin = input$lat[1]#min(selectClim$Latitude)-10# 
+        graphxmax = input$lon[2]#max(selectClim$Longitude)+10# 
+        graphxmin = input$lon[1]#min(selectClim$Longitude)-10# 
+        
+        
+        StationMeans$SP1 <- round(ifelse(StationMeans$PPETRatio < 0.5 & StationMeans$Surplus < 25 & StationMeans$pAET < 75, pmax(StationMeans$Surplus/25, StationMeans$pAET/75)  ,1),15)
+        StationMeans$SP2 <- round(ifelse(StationMeans$SP1 >= 1, ifelse(StationMeans$pAET < 75 & (StationMeans$Deficit >= 150 | StationMeans$PPETRatio < 1), pmax(StationMeans$pAET/75, 150/(StationMeans$Deficit+150)),1),0),15)
+        StationMeans$SP3 <- round(ifelse(StationMeans$SP2 >= 1, ifelse(StationMeans$Deficit >= 150 | StationMeans$PPETRatio < 1, pmax(150/(StationMeans$Deficit+150)),1),0),15)
+        StationMeans$SP4 <- round(ifelse(StationMeans$SP3 >= 1, pmin(1-StationMeans$Deficit/150),0),15)
+        StationMeans$SPindex <- StationMeans$SP1 + StationMeans$SP2 + StationMeans$SP3 + StationMeans$SP4 + 1 #Seasonal precipitation index
+        StationMeans$Cindex <- pmin(StationMeans$Tclx+15, StationMeans$Tc) #Cold index
+        StationMeans$Dindex <- StationMeans$Deficit/(StationMeans$Deficit + 100)
+        StationMeans$Sindex <- StationMeans$Surplus/(StationMeans$Surplus + 100)
+        StationMeans$Aindex <- StationMeans$pAET/(StationMeans$pAET + 100)
     #Key to climate type_____________________________________________________
     
     
@@ -297,6 +500,7 @@ shinyServer(function(input, output, session) {
                                              labels = c('0', '25   (1)', '50   (2)', '75   (3)', '100 (4)', '125 (5)', '150 (6)', '175 (7)', '200 (8)', 'mm (in)')))+
       
       
+      
       #coord_cartesian(xlim = c(1,12), ylim = c(-20, 43))+
       
       theme(legend.position="bottom") +
@@ -304,7 +508,7 @@ shinyServer(function(input, output, session) {
       scale_color_manual("",values = c("Temperature" = "red", "Mean" = "red", "Low" = "red", "High"="red","Growth"="darkgreen"))+
       scale_shape_manual("",values = c("Mean" = 19, "Low" = 6, "High"=2))+
       coord_fixed(ratio = 1/9,xlim = c(1,12), ylim = c(-20, 43))+
-      labs(title = paste("Climate of ",selectClim[1,]$ECO_NAME, sep=""))# ,  subtitle = my_text1)
+      labs(title = paste("Climate of ",selectClim[1,]$LRU, ": ", MLRAname, sep=""))# ,  subtitle = my_text1)
 #Supplemental Graph1----
     a1=data.frame(x=c(-50,-50,0,0), y=c(0,6,6,0))
     a2=data.frame(x=c(-50,-50,0,0), y=c(6,12,12,6))
@@ -342,8 +546,8 @@ shinyServer(function(input, output, session) {
       geom_line(data=l4, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
       geom_line(data=l5, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
       geom_line(data=l6, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
-      geom_point(data=selectClim, mapping=aes(x=Cindex, y=Tg), color = 'black', size=0.5)+
-      geom_density2d(data=selectClim, mapping=aes(x=Cindex, y=Tg),color = 'black',alpha = 0.25)+
+      geom_point(data=StationMeans, mapping=aes(x=Cindex, y=Tg), color = 'black', size=0.5)+
+      geom_density2d(data=StationMeans, mapping=aes(x=Cindex, y=Tg),color = 'black',alpha = 0.25)+
       scale_fill_manual("Legend", values = c("alpine" = "pink",
                                              "boreal" = "darkgreen",
                                              "temperate" = "greenyellow",
@@ -359,7 +563,7 @@ shinyServer(function(input, output, session) {
                                   '-5 (-20)','0 (-15)','5 (-10)','10 (-5)','15 (0)','20 (5)','25 (10)','30 (15)'))+
       scale_y_continuous(name= "Growing Season", breaks=c(0,6,12,18,24,30))+
       coord_fixed(ratio = 1/1,xlim = c(-45,30), ylim = c(0, 33))+
-   labs(title = paste("Climate of ",selectClim[1,]$ECO_NAME, sep=""))+
+   labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
    theme_bw()+
    theme(legend.position='right',axis.text.x = element_text(angle = 90, vjust = 0, hjust = 0),
          panel.grid.major = element_line(), panel.grid.minor = element_blank())
@@ -387,8 +591,8 @@ shinyServer(function(input, output, session) {
    geom_polygon(data=bm4, mapping=aes(x=x, y=y, fill='subhumid'),alpha = 0.2)+
    geom_polygon(data=bm5, mapping=aes(x=x, y=y, fill='humid'),alpha = 0.2)+
    geom_polygon(data=bm6, mapping=aes(x=x, y=y, fill='perhumid'),alpha = 0.2)+
-   geom_point(data=selectClim, mapping=aes(y=SPindex, x=Mindex), color = 'black', size=0.5)+
-   geom_density2d(data=selectClim, mapping=aes(y=SPindex, x=Mindex),color = 'black',alpha = 0.25)+
+   geom_point(data=StationMeans, mapping=aes(y=SPindex, x=Mindex), color = 'black', size=0.5)+
+   geom_density2d(data=StationMeans, mapping=aes(y=SPindex, x=Mindex),color = 'black',alpha = 0.25)+
    scale_fill_manual("Legend", values = c("isoxeric" = "red",
                                           "xerothermic" = "blue",
                                           "pluviothermic" = "yellow",
@@ -405,7 +609,7 @@ shinyServer(function(input, output, session) {
    scale_x_continuous(name= "P/PET Ratio", breaks=c(0, 0.1111, 0.2,0.3333,0.5,0.6667),
                       labels=c('perarid', 'arid', 'semiarid','subhumid','humid','perhumid'))+
    coord_fixed(ratio = 1/9, ylim = c(1,5), xlim = c(0, 1))+
-   labs(title = paste("Climate of ",selectClim[1,]$ECO_NAME, sep=""))+
+   labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
    theme_bw()+
    theme(legend.position='none', axis.text.x = element_text(angle = 0, vjust = 0, hjust = -0.5), axis.text.y = element_text(vjust = -2), 
          panel.grid.major = element_line(), panel.grid.minor = element_blank()) 
@@ -437,8 +641,8 @@ shinyServer(function(input, output, session) {
    geom_polygon(data=bmm4, mapping=aes(x=x, y=y, fill='subhumid'),alpha = 0.1)+
    geom_polygon(data=bmm5, mapping=aes(x=x, y=y, fill='humid'),alpha = 0.1)+
    geom_polygon(data=bmm6, mapping=aes(x=x, y=y, fill='perhumid'),alpha = 0.1)+
-   geom_point(data=selectClim, mapping=aes(x=Mindex, y=Tg), color = 'black', size=0.5)+
-   geom_density2d(data=selectClim, mapping=aes(x=Mindex, y=Tg),color = 'black',alpha = 0.25)+
+   geom_point(data=StationMeans, mapping=aes(x=Mindex, y=Tg), color = 'black', size=0.5)+
+   geom_density2d(data=StationMeans, mapping=aes(x=Mindex, y=Tg),color = 'black',alpha = 0.25)+
    scale_fill_manual("Legend", values = c("alpine" = "cyan",
                                           "cool" = "green",
                                           "mild" = "yellow",
@@ -457,7 +661,7 @@ shinyServer(function(input, output, session) {
                       labels=c('perarid', 'arid 0.125', 'semiarid 0.25','subhumid 0.5','humid 1','perhumid 2'))+
    coord_fixed(ratio = 1/30,ylim = c(0,30), xlim = c(0, 1))+
    
-   labs(title = paste("Climate of ",selectClim[1,]$ECO_NAME, sep=""))+
+   labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
    theme_bw()+
    theme(legend.position='none', axis.text.x = element_text(angle = 90, vjust = 0, hjust = 1), 
          axis.text.y = element_text(vjust = 0), 
@@ -477,8 +681,8 @@ shinyServer(function(input, output, session) {
    geom_polygon(data=b3, mapping=aes(x=x, y=y, fill='d'),alpha = 0.2)+
    geom_polygon(data=b4, mapping=aes(x=x, y=y, fill='c'),alpha = 0.2)+
    geom_line(data=humidline, mapping=aes(x=x, y=y, fill='c'),color = 'black',alpha = 0.2)+
-   geom_point(data=selectClim, mapping=aes(x=Dindex, y=Sindex), color = 'black', size=0.5)+
-   geom_density2d(data=selectClim, mapping=aes(x=Dindex, y=Sindex),color = 'black',alpha = 0.25)+
+   geom_point(data=StationMeans, mapping=aes(x=Dindex, y=Sindex), color = 'black', size=0.5)+
+   geom_density2d(data=StationMeans, mapping=aes(x=Dindex, y=Sindex),color = 'black',alpha = 0.25)+
    scale_fill_manual("Legend", values = c(
                                           "a" = "red",
                                           "b" = "yellow",
@@ -492,7 +696,7 @@ shinyServer(function(input, output, session) {
                       labels=c('0', '25', '50','75','100','150','300','600'))+
    coord_fixed(ratio = 1/1, ylim = c(0, 1), xlim = c(0, 1))+
    
-   labs(title = paste("Climate of ",selectClim[1,]$ECO_NAME, sep=""))+
+   labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
    theme_bw()+
    theme(legend.position='none', axis.text.x = element_text(angle = 90, vjust = 0, hjust = 0), 
          axis.text.y = element_text(vjust = 0),panel.grid.major = element_line(), panel.grid.minor = element_blank()) 
@@ -523,8 +727,8 @@ shinyServer(function(input, output, session) {
    geom_polygon(data=bmm4, mapping=aes(x=x, y=y, fill='b'),alpha = 0.1)+
    geom_polygon(data=bmm5, mapping=aes(x=x, y=y, fill='b'),alpha = 0.1)+
    geom_polygon(data=bmm6, mapping=aes(x=x, y=y, fill='b'),alpha = 0.1)+
-   geom_point(data=selectClim, mapping=aes(x=Aindex, y=Tg), color = 'black', size=0.5)+
-   geom_density2d(data=selectClim, mapping=aes(x=Aindex, y=Tg),color = 'black',alpha = 0.25)+
+   geom_point(data=StationMeans, mapping=aes(x=Aindex, y=Tg), color = 'black', size=0.5)+
+   geom_density2d(data=StationMeans, mapping=aes(x=Aindex, y=Tg),color = 'black',alpha = 0.25)+
    scale_fill_manual("Legend", values = c("alpine" = "cyan",
                                           "cool" = "green",
                                           "mild" = "yellow",
@@ -539,7 +743,7 @@ shinyServer(function(input, output, session) {
                       labels=c('0', '25', '50','75','100','150','300'))+
    coord_fixed(ratio = 1/30,ylim = c(0,30), xlim = c(0, 1))+
    
-   labs(title = paste("Climate of ",selectClim[1,]$ECO_NAME, sep=""))+
+   labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
    theme_bw()+
    theme(legend.position='none', axis.text.x = element_text(angle = 90, vjust = 0, hjust = 0), 
          axis.text.y = element_text(vjust = 0),panel.grid.major = element_line(), panel.grid.minor = element_blank()) 
@@ -568,8 +772,8 @@ shinyServer(function(input, output, session) {
    geom_polygon(data=bmm4, mapping=aes(x=x, y=y, fill='b'),alpha = 0.1)+
    geom_polygon(data=bmm5, mapping=aes(x=x, y=y, fill='b'),alpha = 0.1)+
    geom_polygon(data=bmm6, mapping=aes(x=x, y=y, fill='b'),alpha = 0.1)+
-   geom_point(data=selectClim, mapping=aes(x=Cindex, y=Aindex), color = 'black', size=0.5)+
-   geom_density2d(data=selectClim, mapping=aes(x=Cindex, y=Aindex),color = 'black',alpha = 0.25)+
+   geom_point(data=StationMeans, mapping=aes(x=Cindex, y=Aindex), color = 'black', size=0.5)+
+   geom_density2d(data=StationMeans, mapping=aes(x=Cindex, y=Aindex),color = 'black',alpha = 0.25)+
    scale_fill_manual("Legend", values = c("polar" = "orange",
                                           "temperate" = "yellow",
                                           "mild" = "yellowgreen",
@@ -585,7 +789,7 @@ shinyServer(function(input, output, session) {
                       labels=c('0', '25', '50','75','100','150','300'))+
    coord_fixed(ratio = 30/1,xlim = c(-40,30), ylim = c(0,1))+
    
-   labs(title = paste("Climate of ",selectClim[1,]$ECO_NAME, sep=""))+
+   labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
    theme_bw()+
    theme(legend.position='none', axis.text.x = element_text(angle = 90, vjust = 0, hjust = 0), 
          axis.text.y = element_text(vjust = 0),panel.grid.major = element_line(), panel.grid.minor = element_blank()) 
@@ -611,8 +815,8 @@ shinyServer(function(input, output, session) {
    geom_polygon(data=bmm1, mapping=aes(x=x, y=y, fill='a'),alpha = 0.1)+
    geom_polygon(data=bmm2, mapping=aes(x=x, y=y, fill='b'),alpha = 0.1)+
    
-   geom_point(data=selectClim, mapping=aes(x=Mindex, y=Dindex), color = 'black', size=0.5)+
-   geom_density2d(data=selectClim, mapping=aes(x=Mindex, y=Dindex),color = 'black',alpha = 0.25)+
+   geom_point(data=StationMeans, mapping=aes(x=Mindex, y=Dindex), color = 'black', size=0.5)+
+   geom_density2d(data=StationMeans, mapping=aes(x=Mindex, y=Dindex),color = 'black',alpha = 0.25)+
    scale_fill_manual("Legend", values = c("perarid" = "red",
                                           "arid" = "orange",
                                           "semiarid" = "yellow",
@@ -629,22 +833,41 @@ shinyServer(function(input, output, session) {
                       labels=c('0', '25', '50','75','100','150','300'))+
    coord_fixed(ratio = 1/1,xlim = c(0,1), ylim = c(0, 1))+
    
-   labs(title = paste("Climate of ",selectClim[1,]$ECO_NAME, sep=""))+
+   labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
    theme_bw()+
    theme(legend.position='none', axis.text.x = element_text(angle = 90, vjust = 0, hjust = 0), 
          axis.text.y = element_text(vjust = 0),panel.grid.major = element_line(), panel.grid.minor = element_blank()) 
  
+ #map----
+ ocean = data.frame(y=c(-90,-90,90,90), x=c(-180,180,180,-180))
+ 
+ climplot9 <-  ggplot() +
+   geom_polygon(data = ocean, 
+                aes(x = x, y = y),
+                color = 'darkgray', fill = 'lightcyan', size = .2)+
+   geom_sf(data = states,
+           color = 'darkgray', fill = 'lightyellow', size = .2)+
+   geom_sf(data = lakes,
+           color = 'darkgray', fill = 'lightcyan', size = .2)+
+   geom_polygon(data = selectMLRA.shp, 
+                aes(x=long, y=lat, group=group),
+                color = 'darkgray', fill = 'green', alpha=0.7, size = .0, linetype = 'blank')+
+   geom_point(data=StationMeans, mapping=aes(x=Longitude, y=Latitude), color = 'red', size=1)+
+   
+   coord_sf(xlim = c(graphxmin,graphxmax), ylim = c(graphymin,graphymax)) + theme_void() 
+ 
  #----
  
  
-if(input$RadioGraphtype == 1){climplot} 
-else if(input$RadioGraphtype == 2) {climplot2}
+ if(input$RadioGraphtype == 1){climplot} 
+ else if(input$RadioGraphtype == 2) {climplot2}
  else if(input$RadioGraphtype == 3) {climplot3}
  else if(input$RadioGraphtype == 4) {climplot4}
  else if(input$RadioGraphtype == 5) {climplot5}
  else if(input$RadioGraphtype == 6) {climplot6}
  else if(input$RadioGraphtype == 7) {climplot7}
-else{climplot8}
+ else if(input$RadioGraphtype == 8) {climplot8}
+ else{plot(climplot9)}
 
     
 
