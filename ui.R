@@ -1,39 +1,49 @@
 #
-# This is the user-interface definition of a Shiny web application. You can
-# run the application by clicking 'Run App' above.
-#
-# Find out more about building applications with Shiny here:
-# 
-#    http://shiny.rstudio.com/
-#
 library(shiny)
 library(ggplot2)
-#calculate percentiles
 library(plyr)
 
-
-MLRA <- readRDS(file='data/MLRA.RDS')
-
-
-
-n <- sort(unique(MLRA$LRU))
-# Define UI for application that draws a histogram
-shinyUI(fluidPage(
+fluidPage(
   
-  # Application title
-  titlePanel("Climate Graphs"),
+  headerPanel('MLRA Climate Graphs'),
+  sidebarPanel(
+    htmlOutput("MLRA"),
+    htmlOutput("elev"),
+    htmlOutput("lat"),
+    htmlOutput("lon")
+
+
+  ),
+  mainPanel(
+    plotOutput("climplot"),
+    verbatimTextOutput('Climtext'),
+    fluidRow(
   
-  # Sidebar with a slider input for number of bins 
-  sidebarLayout(
-    sidebarPanel(
-      selectInput("mlra",
-                  "Select MLRA:",
-                  n)
+    column(width = 2,
+           radioButtons("RadioUnits", label = ("Select Units"),
+                        choices = list('Metric System' = 'm', 
+                                       'Medieval Units' = 'USC'), 
+                        selected = 'm')
     ),
-    
-    # Show a plot of the generated distribution
-    mainPanel(
-      plotOutput("climplot")
-    )
+column(width = 5,
+           radioButtons("RadioGraphtype",inline = T,  label = ("Select Graph"),
+                        choiceNames = list(HTML("<font size=-2>Monthly"), 
+                                           HTML("Summer × Winter"),
+                                           HTML("Summer × Moisture"), 
+                                           HTML("Surplus × Deficit"),
+                                           HTML("Summer × pAET"),  
+                                           HTML("Winter × pAET"),
+                                           HTML("Moisture × Deficit"),
+                                           HTML("Moisture × Seasonality</font>")),
+                        choiceValues = list(1,2,4,5,6,7,8,3),
+                        selected = 1),
+           HTML("</font>")
+    )),
+           fluidRow(
+                  HTML("<font size=-2>Based on 1981-2010 Climatic Normals. Click here for:"),
+                  tags$a(href="https://www.researchgate.net/publication/327537609_Climate_Classification_Outline", "climate classification"),
+                  HTML(" used above.</font>")
+           )
+
   )
-))
+)
