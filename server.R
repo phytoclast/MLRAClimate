@@ -154,7 +154,7 @@ shinyServer(function(input, output, session) {
     Surplus <- max(MAP - AET, 0)
     Deficit <- max(PET - AET, 0)
     PPETRatio<-MAP/(PET+0.0001)
-    MAAT <- sum(sumMonthly$t)
+    MAAT <- mean(sumMonthly$t)
     SummerBioT <- max(mean(sumMonthly[c(1:4,11:12),'b']), mean(sumMonthly[c(5:10),'b']))
     Tc <- min(sumMonthly$t)
     Tcl <- min(sumMonthly$tl)
