@@ -856,10 +856,20 @@ shinyServer(function(input, output, session) {
    
    coord_sf(xlim = c(graphxmin,graphxmax), ylim = c(graphymin,graphymax)) + theme_void() 
  
+ wmod <- lm(Tg ~ Elevation + Latitude, data = StationMeans)
+ cmod <- lm(Cindex ~ Elevation + Latitude, data = StationMeans)
+ df <- StationMeans
+ df$wfit <- predict.lm(wmod, df)
+ df$cfit <- predict.lm(cmod, df)
+ df$Latitude <- mean(df$Latitude)
+ df$wfit2 <- predict.lm(wmod, df)
+ df$cfit2 <- predict.lm(cmod, df)
+ df$Tg <-  df$Tg + (df$wfit2 - df$wfit)
+ df$Cindex <-  df$Cindex + (df$cfit2 - df$cfit)
  climelev <-  ggplot() +
    geom_point(mapping=aes(y=c(-1000,8000), x=c(-1000,8000)), size=0)+#increase range of graph for extrapolation
-   stat_smooth(data=StationMeans, mapping=aes(y=Tg, x=Elevation, color='Growing Season'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
-   stat_smooth(data=StationMeans, mapping=aes(y=Cindex, x=Elevation, color='Winter'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
+   stat_smooth(data=df, mapping=aes(y=Tg, x=Elevation, color='Growing Season'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
+   stat_smooth(data=df, mapping=aes(y=Cindex, x=Elevation, color='Winter'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
    
    geom_point(data=StationMeans, mapping=aes(y=Tg, x=Elevation, shape='Growing Season', color='Growing Season'), size=1.5)+
    geom_point(data=StationMeans, mapping=aes(y=Cindex, x=Elevation, shape='Winter', color='Winter'), size=1.5)+
