@@ -841,7 +841,7 @@ shinyServer(function(input, output, session) {
  #map----
  ocean = data.frame(y=c(-90,-90,90,90), x=c(-180,180,180,-180))
  
- climplot9 <-  ggplot() +
+ climmap <-  ggplot() +
    geom_polygon(data = ocean, 
                 aes(x = x, y = y),
                 color = 'darkgray', fill = 'lightcyan', size = .2)+
@@ -856,8 +856,25 @@ shinyServer(function(input, output, session) {
    
    coord_sf(xlim = c(graphxmin,graphxmax), ylim = c(graphymin,graphymax)) + theme_void() 
  
- #----
+ climelev <-  ggplot() +
+   geom_point(mapping=aes(y=c(-1000,8000), x=c(-1000,8000)), size=0)+#increase range of graph for extrapolation
+   stat_smooth(data=StationMeans, mapping=aes(y=Tg, x=Elevation, color='Growing Season'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
+   stat_smooth(data=StationMeans, mapping=aes(y=Cindex, x=Elevation, color='Winter'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
+   
+   geom_point(data=StationMeans, mapping=aes(y=Tg, x=Elevation, shape='Growing Season', color='Growing Season'), size=1.5)+
+   geom_point(data=StationMeans, mapping=aes(y=Cindex, x=Elevation, shape='Winter', color='Winter'), size=1.5)+
+   scale_x_continuous(name= "Elevation", 
+                      breaks=c(-500,0, 500,1000,1500,2000,2500,3000,3500,4000,4500,5000,6000,8000))+
+   scale_y_continuous(name= "Temperature", breaks=c(-25,-10,0,6,12,15,18,24,30,36))+
+   coord_fixed(ratio = 1000/15,xlim = c(-250,4500), ylim = c(-30, 33))+
+   labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
+   theme_bw()+
+   scale_shape_manual("",values = c("Winter" = 6, "Growing Season"=2))+
+   scale_color_manual("",values = c("Winter" = 'blue', "Growing Season"='red'))+
+   theme(legend.position="bottom",axis.text.x = element_text(angle = 90, vjust = 0, hjust = 0),
+         panel.grid.major = element_line( colour = 'black', size = 0.1), panel.grid.minor = element_blank())
  
+ #----
  
  if(input$RadioGraphtype == 1){climplot} 
  else if(input$RadioGraphtype == 2) {climplot2}
@@ -867,13 +884,10 @@ shinyServer(function(input, output, session) {
  else if(input$RadioGraphtype == 6) {climplot6}
  else if(input$RadioGraphtype == 7) {climplot7}
  else if(input$RadioGraphtype == 8) {climplot8}
- else{plot(climplot9)}
-
-    
-
-    
-
-    })
+ else if(input$RadioGraphtype == 9) {climmap}
+ else{plot(climelev)}
+ 
+       })
 
     
   output$Climtext = renderText({ 
