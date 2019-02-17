@@ -105,18 +105,32 @@ shinyServer(function(input, output, session) {
                            Elevation >= input$elev[1] &
                            Elevation <= input$elev[2] &
                            LRU %in% MLRA)
-    
-    #Make Monthly Rows
+    #add alternative selection of external data to supplement elevation range for elevation graph. Must be processed like primary, but not used in other graphs.
+    selecty <- mean(selectClim$Latitude)
+    selectx <- mean(selectClim$Longitude)
+    selectz <- mean(selectClim$Elevation)
+    selectClim2 <- subset(Norms2010,
+                          Latitude >= selecty - 5 &
+                            Latitude <= selecty + 5 &
+                            Longitude >= selectx - 7 &
+                            Longitude <= selectx + 7
+    )
+    selectClim2$wts <- 1/(((selectClim2$Latitude - selecty)^2 + (selectClim2$Longitude - selectx)^2)^0.5+5)#give less weight for more distant points.
+    selectClim2$LRU <- 'other' #Relabeling the external data to identify it later to take it back out.
+    selectClim$wts <- 1 #Full weight for primary internal data.
+    selectClim <- rbind(selectClim, selectClim2)
+    rm(selectClim2)
+    #Make Monthly Rows. Added criteria to exclude external data.
     #Jan
-    selectMonthly <- selectClim[,c("LRU","Station_ID","State","Latitude","Longitude","Elevation","t01","tl01","pp01")]
+    selectMonthly <- selectClim[selectClim$wts >=1,c("LRU","Station_ID","State","Latitude","Longitude","Elevation","t01","tl01","pp01")]
     colnames(selectMonthly) <- c("LRU","Station_ID","State","Latitude","Longitude","Elevation","t","tl","p")
     selectMonthly$Month<- 1
     
     #Feb-Dec
     for (i in 1:11){
       
-      selectMonthlyA <- selectClim[,c("LRU","Station_ID","State","Latitude","Longitude","Elevation",
-                                      colnames(selectClim)[which(colnames(selectClim)=='t01')+i],
+      selectMonthlyA <- selectClim[selectClim$wts >=1,c("LRU","Station_ID","State","Latitude","Longitude","Elevation",
+                                                        colnames(selectClim)[which(colnames(selectClim)=='t01')+i],
                                       colnames(selectClim)[which(colnames(selectClim)=='tl01')+i],
                                       colnames(selectClim)[which(colnames(selectClim)=='pp01')+i])]
       colnames(selectMonthlyA)<- c("LRU","Station_ID","State","Latitude","Longitude","Elevation","t","tl","p")
@@ -228,7 +242,7 @@ shinyServer(function(input, output, session) {
                                                 "tl01", "tl02", "tl03", "tl04", "tl05", "tl06",
                                                 "tl07", "tl08", "tl09", "tl10", "tl11", "tl12",
                                                 "pp01", "pp02", "pp03", "pp04", "pp05", "pp06",
-                                                "pp07", "pp08", "pp09", "pp10", "pp11","pp12")],
+                                                "pp07", "pp08", "pp09", "pp10", "pp11","pp12","wts")],
                                   by=list(selectClim$LRU, selectClim$Station_ID, selectClim$Station_Name, selectClim$State, selectClim$Latitude, selectClim$Longitude, selectClim$Elevation), FUN='mean')
         colnames(StationMeans)[1:7] <- c('LRU', 'Station_ID', 'Station_Name', 'State', 'Latitude', 'Longitude', 'Elevation')
         StationMeans$b01 <- 0
@@ -401,7 +415,7 @@ shinyServer(function(input, output, session) {
         StationMeans <- 
           StationMeans[,c("LRU","Station_ID","Station_Name","State",
                           "Latitude","Longitude","Elevation","Tg","Tc","Tcl","Tw","Twh","Tclx","MAAT","MAP","PET","AET","pAET",
-                          "Deficit","Surplus")]
+                          "Deficit","Surplus","wts")]#must include wts term.
         
         StationMeans <- merge(StationMeans, NormCoordTrans, by='Station_ID')
         StationMeans$PPETRatio <- StationMeans$MAP/(StationMeans$PET +0.0001)
@@ -422,7 +436,12 @@ shinyServer(function(input, output, session) {
         StationMeans$Dindex <- StationMeans$Deficit/(StationMeans$Deficit + 100)
         StationMeans$Sindex <- StationMeans$Surplus/(StationMeans$Surplus + 100)
         StationMeans$Aindex <- StationMeans$pAET/(StationMeans$pAET + 100)
-    #Key to climate type_____________________________________________________
+    
+        #Swap out the external data to a seperate data frame and retain internal data for all but elevation graph.
+        StationMeans2<- StationMeans
+        StationMeans <- StationMeans[StationMeans$wts >=1,]
+        
+        #Key to climate type_____________________________________________________
     
     
     Seasonalilty <- ifelse(Deficit < 150 & PPETRatio>=1, "Isopluvial",
@@ -855,27 +874,31 @@ shinyServer(function(input, output, session) {
    geom_point(data=StationMeans, mapping=aes(x=Longitude, y=Latitude), color = 'red', size=1)+
    
    coord_sf(xlim = c(graphxmin,graphxmax), ylim = c(graphymin,graphymax)) + theme_void() 
- 
- wmod <- lm(Tg ~ Elevation + Latitude, data = StationMeans)
- cmod <- lm(Cindex ~ Elevation + Latitude, data = StationMeans)
- df <- StationMeans
+ #Model temperature elevation curve using inputs controlling for latitude and longitude.
+ wmod <- lm(Tg ~ Elevation + Latitude + Longitude, weight = StationMeans2$wts,data = StationMeans2)
+ cmod <- lm(Cindex ~ Elevation + Latitude + Longitude, weight = StationMeans2$wts, data = StationMeans2)
+ df <- StationMeans2
  df$wfit <- predict.lm(wmod, df)
  df$cfit <- predict.lm(cmod, df)
- df$Latitude <- mean(df$Latitude)
+ df$Latitude <- selecty
+ df$Longitude <-  selectx
  df$wfit2 <- predict.lm(wmod, df)
  df$cfit2 <- predict.lm(cmod, df)
  df$Tg <-  df$Tg + (df$wfit2 - df$wfit)
  df$Cindex <-  df$Cindex + (df$cfit2 - df$cfit)
+ subzero <- data.frame(y=c(0,0,-40,-40), x=c(-1000,9000,9000,-1000))#Make a rectangle to mark limit of growing season curve validity.
+ 
  climelev <-  ggplot() +
    geom_point(mapping=aes(y=c(-1000,8000), x=c(-1000,8000)), size=0)+#increase range of graph for extrapolation
-   stat_smooth(data=df, mapping=aes(y=Tg, x=Elevation, color='Growing Season'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
-   stat_smooth(data=df, mapping=aes(y=Cindex, x=Elevation, color='Winter'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
+   geom_polygon(data=subzero, mapping=aes(x=x, y=y),fill='lightcyan', alpha = 0.8)+
+   stat_smooth(data=df, mapping=aes(y=Tg, x=Elevation, weight = df$wts, color='Growing Season'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
+   stat_smooth(data=df, mapping=aes(y=Cindex, x=Elevation, weight = df$wts, color='Winter'), method='lm', formula='y~x', fullrange = TRUE, size=0.5)+
    
-   geom_point(data=StationMeans, mapping=aes(y=Tg, x=Elevation, shape='Growing Season', color='Growing Season'), size=1.5)+
-   geom_point(data=StationMeans, mapping=aes(y=Cindex, x=Elevation, shape='Winter', color='Winter'), size=1.5)+
+   geom_point(data=StationMeans, mapping=aes(y=Tg, x=Elevation, shape='Growing Season', color='Growing Season'), size=1.5, alpha=9/(nrow(StationMeans)+9)+1/10)+
+   geom_point(data=StationMeans, mapping=aes(y=Cindex, x=Elevation, shape='Winter', color='Winter'), size=1.5,alpha=9/(nrow(StationMeans)+9)+1/10)+
    scale_x_continuous(name= "Elevation", 
                       breaks=c(-500,0, 500,1000,1500,2000,2500,3000,3500,4000,4500,5000,6000,8000))+
-   scale_y_continuous(name= "Temperature", breaks=c(-25,-10,0,6,12,15,18,24,30,36))+
+   scale_y_continuous(name= "Temperature", breaks=c(-25,-10,0,6,12,18,24,30,36))+
    coord_fixed(ratio = 1000/15,xlim = c(-250,4500), ylim = c(-30, 33))+
    labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
    theme_bw()+
