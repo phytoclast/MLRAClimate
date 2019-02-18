@@ -20,12 +20,15 @@ fluidPage(
     verbatimTextOutput('Climtext'),
     fluidRow(
   
-    column(width = 2,
-           radioButtons("RadioUnits", label = ("Select Units"),
-                        choices = list('Metric System' = 'm', 
-                                       'Medieval Units' = 'USC'), 
-                        selected = 'm')
-    ),
+      column(width = 2,
+             radioButtons("RadioUnits", label = ("Select Units"),
+                          choices = list('Metric System' = 'm', 
+                                         'Medieval Units' = 'USC'), 
+                          selected = 'm')
+      ),
+      column(width = 2,
+             checkboxInput("saveselect", label = "Compare MLRA", value = FALSE)
+      ),
     column(width = 5,
            radioButtons("RadioGraphtype",inline = T,  label = ("Select Graph"),
                         choiceNames = list(HTML("<font size=-2>Monthly"), 
@@ -41,6 +44,7 @@ fluidPage(
                         
                         choiceValues = list(1,2,4,5,6,7,8,3,9,10),
                         selected = 1),
+           
     HTML("</font>")
     )),
   fluidRow(

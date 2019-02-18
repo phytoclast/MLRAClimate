@@ -1,11 +1,14 @@
 MLRAname <- 'mlra'
-MLRA <- '18'
+MLRA <- '98A'
 selectClim <- subset(Norms2010,
                      Latitude >= -90 &
                        Latitude <= 90 &
                        Longitude >= -180 &
                        Longitude <= 180 &
                        LRU %in% MLRA)
+
+#savedselect <- StationMeans
+#saveRDS(savedselect, 'data/savedselect.RDS')
 selecty <- mean(selectClim$Latitude)
 selectx <- mean(selectClim$Longitude)
 selectz <- mean(selectClim$Elevation)
@@ -20,6 +23,7 @@ selectClim2$LRU <- 'other'
 selectClim$wts <- 1
 selectClim <- rbind(selectClim, selectClim2)
 rm(selectClim2)
+rm(savedselect)
 #Make Monthly Rows. Added criteria to exclude external data.
 #Jan
 selectMonthly <- selectClim[selectClim$wts >=1,c("LRU","Station_ID","State","Latitude","Longitude","Elevation","t01","tl01","pp01")]
@@ -380,6 +384,92 @@ Climatetext<-paste(BioTemperatureW," ",BioTemperatureC,", ",MRegime," ",Seasonal
 #Swap out the external data to a seperate data frame and retain internal data for all but elevation graph.
 StationMeans2<- StationMeans
 StationMeans <- StationMeans[StationMeans$wts >=1,]
+
+
+#Supplemental Graph1----
+a1=data.frame(x=c(-50,-50,0,0), y=c(0,6,6,0))
+a2=data.frame(x=c(-50,-50,0,0), y=c(6,12,12,6))
+a3=data.frame(x=c(-50,-50,0,0), y=c(12,36,36,12))
+a4=data.frame(x=c(0,0,6,0), y=c(0,6,6,0))
+a5=data.frame(x=c(0,0,18,6), y=c(6,18,18,6))
+a6=data.frame(x=c(0,0,15,15), y=c(18,36,36,18))
+a7=data.frame(x=c(15,15,36,18), y=c(18,36,36,18))
+
+ll1 <- data.frame(x=c(-50,6), y=c(6,6))
+ll2 <- data.frame(x=c(0,0), y=c(0,36))
+ll3 <- data.frame(x=c(15,15), y=c(18,36))
+l1 <- data.frame(x=c(-50,12), y=c(12,12))
+l2 <- data.frame(x=c(-50,0), y=c(15,15))
+l3 <- data.frame(x=c(-50,18), y=c(18,18))
+l4 <- data.frame(x=c(0,24), y=c(24,24))
+l5 <- data.frame(x=c(-10,-10), y=c(0,36))
+l6 <- data.frame(x=c(-25,-25), y=c(0,36))
+
+climplot2 <-  ggplot() +
+  geom_polygon(data=a1, mapping=aes(x=x, y=y, fill='alpine'),alpha = 0.5)+
+  geom_polygon(data=a2, mapping=aes(x=x, y=y, fill='boreal'),alpha = 0.5)+
+  geom_polygon(data=a3, mapping=aes(x=x, y=y, fill='temperate'),alpha = 0.5)+
+  geom_polygon(data=a4, mapping=aes(x=x, y=y, fill='andean'),alpha = 0.5)+
+  geom_polygon(data=a5, mapping=aes(x=x, y=y, fill='oceanic'),alpha = 0.5)+
+  geom_polygon(data=a6, mapping=aes(x=x, y=y, fill='subtropical'),alpha = 0.5)+
+  geom_polygon(data=a7, mapping=aes(x=x, y=y, fill='tropical'),alpha = 0.5)+
+  
+  geom_line(data=ll1, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_line(data=ll2, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_line(data=ll3, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_line(data=l1, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_line(data=l2, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_line(data=l3, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_line(data=l4, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_line(data=l5, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_line(data=l6, mapping=aes(x=x, y=y),alpha = 0.3, color='black', linetype='solid')+
+  geom_point(data=StationMeans, mapping=aes(x=Cindex, y=Tg, color = 'Current MLRA'), size=0.5)+
+  geom_density2d(data=StationMeans, mapping=aes(x=Cindex, y=Tg), color = 'black',alpha = 0.25)+
+  geom_point(data=savedselect, mapping=aes(x=Cindex, y=Tg, color = 'Saved MLRA'), size=0.5)+
+  geom_density2d(data=savedselect, mapping=aes(x=Cindex, y=Tg),color = 'red',alpha = 0.25)+
+  scale_fill_manual("Legend", values = c("alpine" = "pink",
+                                         "boreal" = "darkgreen",
+                                         "temperate" = "greenyellow",
+                                         "andean" = "lightblue",
+                                         "oceanic" = "darkcyan",
+                                         "subtropical" = "orange",
+                                         "tropical" = "darkred"
+                                         
+  ))+
+  scale_color_manual("",values = c("Current MLRA" = "black","Saved MLRA" = "red"))+
+  scale_x_continuous(name= "Coldest Month (Annual Extreme Minimum)", 
+                     breaks=c(-45,-40, -35, -30, -25, -20,-15, -10,-5, 0,5, 10,15, 20,25,30),
+                     labels=c('-45 (-60)','-40 (-55)', '-35 (-50)','-30 (-45)', '-25 (-40)','-20 (-35)','-15 (-30)','-10 (-25)',
+                              '-5 (-20)','0 (-15)','5 (-10)','10 (-5)','15 (0)','20 (5)','25 (10)','30 (15)'))+
+  scale_y_continuous(name= "Growing Season", breaks=c(0,6,12,18,24,30))+
+  coord_fixed(ratio = 1/1,xlim = c(-45,30), ylim = c(0, 33))+
+  labs(title = paste("Climate of ",StationMeans[1,]$LRU, ": ", MLRAname, sep=""))+
+  theme_bw()+
+  theme(legend.position='right',axis.text.x = element_text(angle = 90, vjust = 0, hjust = 0),
+        panel.grid.major = element_line(), panel.grid.minor = element_blank())
+
+
+climplot2
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 #Model temperature elevation curve using inputs controlling for latitude and longitude.
 wmod <- lm(Tg ~ Elevation + Latitude + Longitude, weight = StationMeans2$wts,data = StationMeans2)
 cmod <- lm(Cindex ~ Elevation + Latitude + Longitude, weight = StationMeans2$wts, data = StationMeans2)

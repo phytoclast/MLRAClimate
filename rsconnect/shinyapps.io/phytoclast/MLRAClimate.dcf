@@ -5,9 +5,9 @@ account: phytoclast
 server: shinyapps.io
 hostUrl: https://api.shinyapps.io/v1
 appId: 583971
-bundleId: 1880992
+bundleId: 1882354
 url: https://phytoclast.shinyapps.io/MLRAClimate/
-when: 1550428625.19565
+when: 1550498157.42774
 asMultiple: FALSE
 asStatic: FALSE
 ignoredFiles: misc.R|misc2.R
