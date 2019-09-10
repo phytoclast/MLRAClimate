@@ -48,8 +48,8 @@ fluidPage(
     HTML("</font>")
     )),
   fluidRow(
-      HTML("<font size=-2>Based on 1981-2010 Climatic Normals. Click here for:"),
-                  tags$a(href="https://www.researchgate.net/publication/327537609_Climate_Classification_Outline", "climate classification"),
+      HTML("<font size=-2>Based on 1981-2010 Climatic Normals. Error bars on temperature and precipitation are the 20th and 80th percentiles for the 30 years of data, and encompasing the geographic variability. Other graphs show each station mean as individual points. Click here for more information about the "),
+                  tags$a(href="https://phytoclast.github.io/ClimateClassification/", "climate classification"),
                   HTML(" used above.</font>")
            )
 

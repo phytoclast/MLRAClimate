@@ -1,0 +1,12 @@
+name: MLRAClimate
+title: MLRAClimate
+username:
+account: usda
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 726814
+bundleId: 1885325
+url: https://usda.shinyapps.io/MLRAClimate/
+when: 1550607108.57423
+asMultiple: FALSE
+asStatic: FALSE
